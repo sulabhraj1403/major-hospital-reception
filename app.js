@@ -110,18 +110,40 @@ $("bookingForm").addEventListener("submit",async e=>{
 });
 
 async function loadAppointments(){
-  const {data,error}=await sb.from("appointments").select("*").order("time",{ascending:true}).limit(500);if(error)throw error;const arr=data||[];const today=arr.filter(a=>a.date_key===todayKey());
-  const render=a=>`<div class="item"><div><h3>${esc(a.patient_name)}</h3><p>${esc(a.time)} · ₹${Number(a.fee||0).toFixed(2)} · ${esc(a.payment_method)}</p></div><span class="badge ${a.status==='seen'?'seen':'waiting'}">${esc(a.status||'waiting')}</span></div>`;
-  $("receptionBookings").innerHTML=today.length?today.map(render).join(""):"<div class='panel'>No bookings today.</div>";
-  $("appointmentList").innerHTML=arr.length?arr.map(render).join(""):"<div class='panel'>No bookings found.</div>";
+  const {data,error}=await sb.from("appointments").select("*").is("deleted_at",null).order("date_key",{ascending:false}).order("time",{ascending:true}).limit(500);
+  if(error)throw error;
+  const arr=data||[];const today=arr.filter(a=>a.date_key===todayKey());
+  const render=(a,showDate=false)=>`<div class="item"><div><h3>${esc(a.patient_name)}</h3><p>${showDate?esc(a.date_key)+" · ":""}${esc(a.time)} · ₹${Number(a.fee||0).toFixed(2)} · ${esc(a.payment_method)}</p></div><div class="item-actions"><span class="badge ${a.status==='seen'?'seen':'waiting'}">${esc(a.status||'waiting')}</span><button class="outline" data-delete-booking="${a.id}">Delete</button></div></div>`;
+  $("receptionBookings").innerHTML=today.length?today.map(a=>render(a)).join(""):"<div class='panel'>No bookings today.</div>";
+  $("appointmentList").innerHTML=arr.length?arr.map(a=>render(a,true)).join(""):"<div class='panel'>No bookings found.</div>";
   $("statBookings").textContent=today.length;$("statWaiting").textContent=today.filter(a=>a.status==='waiting').length;$("statSeen").textContent=today.filter(a=>a.status==='seen').length;
+  bindDeleteBookingButtons();
 }
 
 async function loadDoctorPatients(){
   $("doctorList").innerHTML="<div class='panel'>Loading today's patients…</div>";
-  const {data,error}=await sb.from("appointments").select("*").eq("date_key",todayKey()).order("time",{ascending:true});if(error){$("doctorList").innerHTML=`<div class='panel error'>${esc(friendlyError(error))}</div>`;return}
-  $("doctorList").innerHTML=data?.length?data.map(a=>`<div class="item"><div><h3>${esc(a.patient_name)}</h3><p>${esc(a.time)} · Fee ₹${Number(a.fee||0).toFixed(2)} · ${esc(a.payment_method)}</p></div><div class="item-actions"><span class="badge ${a.status==='seen'?'seen':'waiting'}">${esc(a.status||'waiting')}</span><button class="primary" data-visit="${a.id}">Open</button></div></div>`).join(""):"<div class='panel'>No patients booked for you today.</div>";
+  const {data,error}=await sb.from("appointments").select("*").eq("date_key",todayKey()).is("deleted_at",null).order("time",{ascending:true});if(error){$("doctorList").innerHTML=`<div class='panel error'>${esc(friendlyError(error))}</div>`;return}
+  $("doctorList").innerHTML=data?.length?data.map(a=>`<div class="item"><div><h3>${esc(a.patient_name)}</h3><p>${esc(a.time)} · Fee ₹${Number(a.fee||0).toFixed(2)} · ${esc(a.payment_method)}</p></div><div class="item-actions"><span class="badge ${a.status==='seen'?'seen':'waiting'}">${esc(a.status||'waiting')}</span><button class="primary" data-visit="${a.id}">Open</button><button class="outline" data-delete-booking="${a.id}">Delete</button></div></div>`).join(""):"<div class='panel'>No patients booked for you today.</div>";
   document.querySelectorAll("[data-visit]").forEach(b=>b.onclick=()=>openVisit(b.dataset.visit));
+  bindDeleteBookingButtons();
+}
+
+function bindDeleteBookingButtons(){
+  document.querySelectorAll("[data-delete-booking]").forEach(b=>b.onclick=()=>deleteBooking(b.dataset.deleteBooking));
+}
+
+async function deleteBooking(id){
+  if(!id)return;
+  if(!confirm("Delete this booking? The patient record and booking history will remain in the Patients tab."))return;
+  try{
+    const {data,error}=await sb.rpc("soft_delete_booking",{p_appointment_id:id});
+    if(error)throw error;
+    const deleted=Array.isArray(data)?data[0]:data;
+    if(!deleted || deleted.deleted_at==null)throw new Error("The booking was not marked as deleted.");
+    toast("Booking deleted. Patient data remains saved.");
+    await loadAppointments();
+    await loadDoctorPatients();
+  }catch(e){console.error("deleteBooking failed:",e);alert(friendlyError(e));}
 }
 async function openVisit(id){
   const {data:a,error:ae}=await sb.from("appointments").select("*").eq("id",id).single();if(ae)throw ae;selectedVisit=a;const {data:p,error:pe}=await sb.from("patients").select("*").eq("id",a.patient_id).single();if(pe)throw pe;
@@ -170,7 +192,14 @@ async function completeRefund(id){
   }
 }
 
-async function viewPatient(id){const {data:p,error}=await sb.from("patients").select("*").eq("id",id).single();if(error){alert(friendlyError(error));return}$("patientDetails").innerHTML=`<div class='patient-summary'><p><b>Name:</b> ${esc(p.name)}</p><p><b>Age:</b> ${esc(p.age)}</p><p><b>Gender:</b> ${esc(p.gender)}</p><p><b>Mobile:</b> ${esc(p.mobile||"-")}</p><p><b>Address:</b> ${esc(p.address||"-")}</p><p><b>Blood pressure:</b> ${esc(p.blood_pressure||"-")}</p></div>`;showModal("patientViewModal")}
+async function viewPatient(id){
+  const {data:p,error}=await sb.from("patients").select("*").eq("id",id).single();if(error){alert(friendlyError(error));return}
+  const {data:history,error:he}=await sb.from("appointments").select("id,date_key,time,fee,payment_method,status,notes,deleted_at").eq("patient_id",id).order("date_key",{ascending:false}).order("time",{ascending:false}).limit(100);
+  if(he){alert(friendlyError(he));return}
+  const historyHtml=history?.length?`<h4 style="margin-top:18px">Booking history</h4><div class="history">${history.map(a=>`<div class="note"><b>${esc(a.date_key)} · ${esc(a.time)}</b><br>Fee: ₹${Number(a.fee||0).toFixed(2)} · ${esc(a.payment_method)} · ${esc(a.status||"-")}${a.deleted_at?" · Deleted":""}${a.notes?`<br>Notes: ${esc(a.notes)}`:""}</div>`).join("")}</div>`:"<p class='hint'>No booking history recorded.</p>`;
+  $("patientDetails").innerHTML=`<div class='patient-summary'><p><b>Name:</b> ${esc(p.name)}</p><p><b>Age:</b> ${esc(p.age)}</p><p><b>Gender:</b> ${esc(p.gender)}</p><p><b>Mobile:</b> ${esc(p.mobile||"-")}</p><p><b>Address:</b> ${esc(p.address||"-")}</p><p><b>Blood pressure:</b> ${esc(p.blood_pressure||"-")}</p>${historyHtml}</div>`;
+  showModal("patientViewModal")
+}
 
 $("email").focus();
 
