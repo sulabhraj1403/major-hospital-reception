@@ -1,4 +1,4 @@
-node_modules/
+supabase-secret*.js
 .env
-.firebase/
-*.log
+.env.*
+node_modules/

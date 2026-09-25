@@ -1,164 +1,64 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Major Hospital — Management System</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Major Hospital — Management System</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="doctorLoginView" class="center-screen hidden">
-    <div class="login-card">
-      <div class="brand">
-        <div class="logo">MH</div>
-        <div><h1>Doctor Login</h1><p>Major Hospital</p></div>
-      </div>
-      <form id="loginForm">
-        <label>Email</label>
-        <input id="email" type="email" autocomplete="username" required>
-        <label>Password</label>
-        <input id="password" type="password" autocomplete="current-password" required>
-        <button class="primary" type="submit">Doctor Login</button>
-        <div id="loginError" class="error"></div>
-        <button type="button" class="outline backReception">Back to Reception</button>
-      </form>
-    </div>
+<div id="doctorLoginView" class="center-screen hidden">
+  <div class="login-card">
+    <div class="brand"><div class="logo">MH</div><div><h1>Doctor Login</h1><p>Major Hospital</p></div></div>
+    <form id="loginForm">
+      <label>Email</label><input id="email" type="email" autocomplete="username" required>
+      <label>Password</label><input id="password" type="password" autocomplete="current-password" required>
+      <button class="primary" type="submit">Login</button>
+      <div id="loginError" class="error"></div>
+      <button type="button" class="outline backReception">Back to Reception</button>
+    </form>
   </div>
+</div>
 
-  <div id="appView" class="hidden">
-    <header class="topbar">
-      <div class="brand compact">
-        <div class="logo">MH</div>
-        <div><strong>Major Hospital</strong><span id="roleLabel"></span></div>
-      </div>
-      <div class="top-actions"><span id="userEmail"></span><button id="logoutBtn" class="outline">Logout</button></div>
-    </header>
+<div id="appView" class="hidden">
+<header class="topbar"><div class="brand compact"><div class="logo">MH</div><div><strong>Major Hospital</strong><span id="roleLabel"></span></div></div><div class="top-actions"><span id="userEmail"></span><button id="logoutBtn" class="outline">Logout</button></div></header>
+<div class="layout">
+<aside class="sidebar">
+<button data-page="reception" class="nav active">Reception</button>
+<button data-page="patients" class="nav">Patients</button>
+<button data-page="appointments" class="nav">Bookings</button>
+<button data-page="doctor" class="nav doctor-only hidden">Doctor</button>
+<button data-page="admin" class="nav admin-only hidden">Admin</button>
+<button id="doctorLoginNav" class="nav">Doctor Login</button>
+</aside>
+<main class="content">
+<section id="reception" class="page">
+<div class="page-head"><div><h2>Reception</h2><p>Patient registration, bookings and cash refunds</p></div><button class="primary" id="newBookingBtn">+ New Booking</button></div>
+<div class="cards"><div class="stat"><span>Today's bookings</span><strong id="statBookings">0</strong></div><div class="stat"><span>Waiting</span><strong id="statWaiting">0</strong></div><div class="stat"><span>Seen</span><strong id="statSeen">0</strong></div><div class="stat"><span>Pending refunds</span><strong id="statRefunds">0</strong></div></div>
+<div class="panel"><h3>Today's bookings</h3><div id="receptionBookings" class="list"></div></div>
+<div class="panel" style="margin-top:16px"><h3>Pending cash refunds</h3><div id="refundList" class="list"></div></div>
+</section>
+<section id="patients" class="page hidden"><div class="page-head"><div><h2>Patients</h2><p>Search by name/mobile and place together</p></div></div><div class="toolbar search-grid"><input id="patientSearch" placeholder="Search by name or mobile"><input id="patientPlaceSearch" placeholder="Search by place / address"></div><div id="patientList" class="list"></div></section>
+<section id="appointments" class="page hidden"><div class="page-head"><div><h2>Bookings</h2><p>Create and manage appointments</p></div></div><div id="appointmentList" class="list"></div></section>
+<section id="doctor" class="page hidden"><div class="page-head"><div><h2>Doctor</h2><p>Today's patients and clinical notes</p></div></div><div id="doctorList" class="list"></div></section>
+<section id="admin" class="page hidden"><div class="page-head"><div><h2>Admin</h2><p>System administration</p></div></div><div class="panel"><h3>Doctor setup</h3><p>Create the doctor/admin user in Supabase Authentication, then create the matching row in <code>profiles</code> and a row in <code>doctors</code> for doctors.</p><pre>profiles: id = Auth User UID
+role = doctor | admin
+name = Doctor Name
 
-    <div class="layout">
-      <aside class="sidebar">
-        <button data-page="reception" class="nav active">Reception</button>
-        <button data-page="patients" class="nav">Patients</button>
-        <button data-page="appointments" class="nav">Bookings</button>
-        <button data-page="doctor" class="nav doctor-only">Doctor</button>
-        <button data-page="admin" class="nav admin-only">Admin</button>
-        <button id="doctorLoginNav" class="nav">Doctor Login</button>
-      </aside>
+doctors: id = same Auth User UID
+name = Doctor Name
+active = true</pre><p class="hint">Never put a Supabase secret/service-role key in this website.</p></div></section>
+</main></div></div>
 
-      <main class="content">
-        <section id="reception" class="page">
-          <div class="page-head"><div><h2>Reception</h2><p>Patient registration, bookings and cash refunds</p></div><button class="primary" id="newBookingBtn">+ New Booking</button></div>
-          <div class="cards">
-            <div class="stat"><span>Today's bookings</span><strong id="statBookings">0</strong></div>
-            <div class="stat"><span>Waiting</span><strong id="statWaiting">0</strong></div>
-            <div class="stat"><span>Seen</span><strong id="statSeen">0</strong></div>
-            <div class="stat"><span>Pending refunds</span><strong id="statRefunds">0</strong></div>
-          </div>
-          <div class="panel"><h3>Today's bookings</h3><div id="receptionBookings" class="list"></div></div>
-          <div class="panel" style="margin-top:16px"><h3>Pending cash refunds</h3><div id="refundList" class="list"></div></div>
-        </section>
+<div id="patientModal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h3 id="patientModalTitle">New Patient</h3><button class="close" data-close="patientModal">×</button></div><form id="patientForm" class="form-grid"><input type="hidden" id="patientId"><div><label>Name *</label><input id="pName" required></div><div><label>Age *</label><input id="pAge" type="number" min="0" required></div><div><label>Gender *</label><select id="pGender" required><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div><div><label>Mobile</label><input id="pMobile" inputmode="tel"></div><div class="full"><label>Address / Place</label><textarea id="pAddress" rows="2"></textarea></div><div><label>Blood pressure</label><input id="pBP" placeholder="e.g. 120/80"></div><div class="full actions"><button type="button" class="outline" data-close="patientModal">Cancel</button><button class="primary">Save Patient</button></div></form></div></div>
 
-        <section id="patients" class="page hidden">
-          <div class="page-head"><div><h2>Patients</h2><p>Patient registration and records</p></div></div>
-          <div class="toolbar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px"><input id="patientSearch" placeholder="Search by name or mobile"><input id="patientPlaceSearch" placeholder="Search by place / address"></div>
-          <div id="patientList" class="list"></div>
-        </section>
+<div id="bookingModal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h3>New Booking</h3><button class="close" data-close="bookingModal">×</button></div><form id="bookingForm" class="form-grid"><div class="full"><label>Patient *</label><select id="bPatient" required></select></div><div><label>Doctor *</label><select id="bDoctor" required></select></div><div><label>Time *</label><input id="bTime" type="time" required></div><div><label>Fee *</label><input id="bFee" type="number" min="0" step="0.01" required></div><div><label>Payment method *</label><select id="bPayment" required><option>Cash</option><option>UPI</option></select></div><div id="upiTimeWrap" class="hidden"><label>UPI payment time *</label><input id="bUpiTime" type="time"></div><div class="full actions"><button type="button" class="outline" data-close="bookingModal">Cancel</button><button class="primary">Create Booking</button></div></form></div></div>
 
-        <section id="appointments" class="page hidden">
-          <div class="page-head"><div><h2>Bookings</h2><p>Create and manage appointments</p></div></div>
-          <div id="appointmentList" class="list"></div>
-        </section>
+<div id="doctorModal" class="modal hidden"><div class="modal-card wide"><div class="modal-head"><h3>Patient Visit</h3><button class="close" data-close="doctorModal">×</button></div><div id="doctorPatientInfo" class="patient-info"></div><div id="previousNotes" class="history"></div><form id="doctorForm"><label>Today's notes</label><textarea id="doctorNotes" rows="6" placeholder="Enter clinical notes"></textarea><div class="actions"><button type="button" class="outline" data-close="doctorModal">Close</button><button type="button" class="secondary" id="refundBtn">Refund / Waive Fee</button><button type="button" class="primary" id="saveNotesBtn">Save Notes</button><button type="button" class="primary" id="seenBtn">Mark as Seen</button></div></form></div></div>
 
-        <section id="doctor" class="page hidden">
-          <div class="page-head"><div><h2>Doctor</h2><p>Today's patients and clinical notes</p></div></div>
-          <div id="doctorList" class="list"></div>
-        </section>
+<div id="refundModal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h3>Refund / Waive Fee</h3><button class="close" data-close="refundModal">×</button></div><div id="refundPatientInfo" class="patient-info"></div><form id="refundForm"><label>Original fee</label><input id="rOriginal" readonly><label>Refund amount</label><input id="rAmount" type="number" min="0" step="0.01" required><p class="hint">Refund method is always cash.</p><div class="actions"><button type="button" class="outline" data-close="refundModal">Cancel</button><button class="primary">Submit Refund</button></div></form></div></div>
 
-        <section id="admin" class="page hidden">
-          <div class="page-head"><div><h2>Admin</h2><p>System administration</p></div></div>
-          <div class="panel">
-            <h3>Role setup</h3>
-            <p>Create users in Firebase Authentication. Then create a matching Firestore document in <code>users</code> with the user's UID and role.</p>
-            <pre>users/{UID}
-{
-  "name": "Doctor Name",
-  "role": "doctor"
-}</pre>
-          </div>
-        </section>
-      </main>
-    </div>
-  </div>
-
-  <div id="patientModal" class="modal hidden">
-    <div class="modal-card">
-      <div class="modal-head"><h3 id="patientModalTitle">New Patient</h3><button class="close" data-close="patientModal">×</button></div>
-      <form id="patientForm" class="form-grid">
-        <input type="hidden" id="patientId">
-        <div><label>Name *</label><input id="pName" required></div>
-        <div><label>Age *</label><input id="pAge" type="number" min="0" required></div>
-        <div><label>Gender *</label><select id="pGender" required><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div>
-        <div><label>Mobile</label><input id="pMobile" inputmode="tel"></div>
-        <div class="full"><label>Address</label><textarea id="pAddress" rows="2"></textarea></div>
-        <div><label>Blood pressure</label><input id="pBP" placeholder="e.g. 120/80"></div>
-        <div class="full actions"><button type="button" class="outline" data-close="patientModal">Cancel</button><button class="primary">Save Patient</button></div>
-      </form>
-    </div>
-  </div>
-
-  <div id="bookingModal" class="modal hidden">
-    <div class="modal-card">
-      <div class="modal-head"><h3>New Booking</h3><button class="close" data-close="bookingModal">×</button></div>
-      <form id="bookingForm" class="form-grid">
-        <div class="full"><label>Patient *</label><select id="bPatient" required></select></div>
-        <div><label>Doctor *</label><select id="bDoctor" required></select></div>
-        <div><label>Time *</label><input id="bTime" type="time" required></div>
-        <div><label>Fee *</label><input id="bFee" type="number" min="0" step="0.01" required></div>
-        <div><label>Payment method *</label><select id="bPayment" required><option>Cash</option><option>UPI</option></select></div>
-        <div id="upiTimeWrap" class="hidden"><label>UPI payment time *</label><input id="bUpiTime" type="time"></div>
-        <div class="full actions"><button type="button" class="outline" data-close="bookingModal">Cancel</button><button class="primary">Create Booking</button></div>
-      </form>
-    </div>
-  </div>
-
-  <div id="doctorModal" class="modal hidden">
-    <div class="modal-card wide">
-      <div class="modal-head"><h3>Patient Visit</h3><button class="close" data-close="doctorModal">×</button></div>
-      <div id="doctorPatientInfo" class="patient-info"></div>
-      <div id="previousNotes" class="history"></div>
-      <form id="doctorForm">
-        <label>Today's notes</label>
-        <textarea id="doctorNotes" rows="6" placeholder="Enter clinical notes"></textarea>
-        <div class="actions">
-          <button type="button" class="outline" data-close="doctorModal">Close</button>
-          <button type="button" class="secondary" id="refundBtn">Refund / Waive Fee</button>
-          <button type="button" class="primary" id="saveNotesBtn">Save Notes</button>
-          <button type="button" class="primary" id="seenBtn">Mark as Seen</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div id="refundModal" class="modal hidden">
-    <div class="modal-card">
-      <div class="modal-head"><h3>Refund / Waive Fee</h3><button class="close" data-close="refundModal">×</button></div>
-      <div id="refundPatientInfo" class="patient-info"></div>
-      <form id="refundForm">
-        <label>Original fee</label><input id="rOriginal" readonly>
-        <label>Refund amount</label><input id="rAmount" type="number" min="0" step="0.01" required>
-        <p class="hint">Refund method is always cash.</p>
-        <div class="actions"><button type="button" class="outline" data-close="refundModal">Cancel</button><button class="primary">Submit Refund</button></div>
-      </form>
-    </div>
-  </div>
-
-  <div id="patientViewModal" class="modal hidden">
-    <div class="modal-card wide">
-      <div class="modal-head"><h3>Patient Details</h3><button class="close" data-close="patientViewModal">×</button></div>
-      <div id="patientDetails"></div>
-    </div>
-  </div>
-
-  <div id="toast" class="toast"></div>
-  <script type="module" src="app.js"></script>
-</body>
-</html>
+<div id="patientViewModal" class="modal hidden"><div class="modal-card wide"><div class="modal-head"><h3>Patient Details</h3><button class="close" data-close="patientViewModal">×</button></div><div id="patientDetails"></div></div></div>
+<div id="toast" class="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module" src="app.js"></script>
+</body></html>

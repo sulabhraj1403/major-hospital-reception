@@ -1,51 +1,32 @@
-# Major Hospital Reception — Web MVP
+# Major Hospital Management System — Supabase version
 
-A responsive Firebase + vanilla JavaScript hospital management website designed to work in Android and desktop browsers. The website opens directly in Reception; Doctor/Admin access uses Firebase login.
+## Files
+- `index.html` — interface
+- `style.css` — responsive styling
+- `app.js` — application logic using Supabase
+- `supabase-config.js` — Project URL + Publishable key placeholders
+- `supabase-schema.sql` — database tables, indexes, grants and RLS policies
 
-## Included
-- Firebase Email/Password login
-- Admin / Doctor / Receptionist roles
-- Patient registration and search
-- Today's bookings
-- Doctor's today's patient list
-- Patient details
-- Doctor notes with edit/update
-- Mark patient as seen
-- Partial or full cash refund request
-- Reception pending-refund screen showing patient and amount
-- Mark cash refund completed
-- Firestore security rules
+## Setup
+1. Create a Supabase project.
+2. In Authentication → Providers, enable **Anonymous Sign-Ins** and **Email** authentication.
+3. Open SQL Editor and run `supabase-schema.sql` completely.
+4. Open Project Settings → API and copy the **Project URL** and **Publishable key** (legacy `anon` key also works where shown).
+5. Put those values in `supabase-config.js`.
+6. Upload all files to GitHub and deploy the repository on Vercel.
 
-## Firebase setup
-1. Create a Firebase project.
-2. Enable Authentication -> Email/Password.
-3. Create Firestore.
-4. Register a Web app.
-5. Put the web config into `firebase-config.js`.
-6. Create users under Authentication -> Users.
-7. For each user, create `users/{UID}` in Firestore, e.g.:
+## Create a doctor
+1. Supabase Dashboard → Authentication → Users → Add user.
+2. Copy that user's UUID.
+3. In SQL Editor run:
+```sql
+insert into public.profiles(id,name,role) values ('UUID','Doctor Name','doctor');
+insert into public.doctors(id,name,active) values ('UUID','Doctor Name',true);
+```
+Use `role='admin'` for an administrator profile. An admin does not need a doctors row unless they also practice as a doctor.
 
-{
-  "name": "Dr. Example",
-  "role": "doctor"
-}
+## Reception
+Reception has no visible login. The site silently creates a Supabase anonymous Auth user. Supabase anonymous users use the `authenticated` database role and can be distinguished in RLS with the `is_anonymous` JWT claim. This is why the SQL file contains explicit RLS policies for anonymous reception sessions.
 
-Allowed roles:
-- admin
-- doctor
-- receptionist
-
-## Important
-Do not put Firebase Admin SDK/service-account private keys in this website.
-
-Before using real patient data:
-- review and test Firestore Security Rules
-- configure appropriate backup/export procedures
-- test role access with separate accounts
-- verify applicable privacy/security requirements
-
-## Vercel
-This is a static site. Import the repository into Vercel and deploy with no build command.
-
-## Important flow
-Reception is the starting page and uses Firebase Anonymous Authentication behind the scenes so the receptionist does not see a login screen. The Doctor Login button opens email/password login. Enable Anonymous Authentication in Firebase Authentication -> Sign-in providers.
+## Security
+The website uses only the public browser key. Never put a Supabase secret/service-role key in `supabase-config.js` or GitHub. Patient/clinical data should not be used in production until the RLS policies, user roles and operational security have been tested. Supabase recommends enabling RLS on exposed tables and using policies/grants to control access.
