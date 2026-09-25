@@ -134,8 +134,23 @@ async function openVisit(id){
 }
 $("saveNotesBtn").onclick=async()=>{try{if(!selectedVisit)return;const notes=$("doctorNotes").value.trim();const {error}=await sb.from("appointments").update({notes}).eq("id",selectedVisit.id);if(error)throw error;const {data:existing}=await sb.from("visits").select("id").eq("appointment_id",selectedVisit.id).limit(1);if(existing?.length){await sb.from("visits").update({notes}).eq("id",existing[0].id)}else{await sb.from("visits").insert({appointment_id:selectedVisit.id,patient_id:selectedVisit.patient_id,doctor_id:currentUser.id,notes})}toast("Notes saved.");await openVisit(selectedVisit.id)}catch(e){alert(friendlyError(e))}};
 $("seenBtn").onclick=async()=>{try{const {error}=await sb.from("appointments").update({status:"seen",seen_at:new Date().toISOString(),seen_by:currentUser.id,notes:$("doctorNotes").value.trim()}).eq("id",selectedVisit.id);if(error)throw error;toast("Patient marked as seen.");hideModal("doctorModal");await loadDoctorPatients();await loadAppointments()}catch(e){alert(friendlyError(e))}};
-$("refundBtn").onclick=()=>{if(!selectedVisit)return;$("refundPatientInfo").innerHTML=`<b>Patient:</b> ${esc(selectedVisit.patient_name)}<br><b>Appointment:</b> ${esc(selectedVisit.time)}<br><b>Refund method:</b> Cash`;$("rOriginal").value=Number(selectedVisit.fee||0).toFixed(2);$("rAmount").value="";showModal("refundModal")};
-$("refundForm").onsubmit=async e=>{e.preventDefault();try{const amount=Number($("rAmount").value),original=Number(selectedVisit.fee||0);if(amount<=0||amount>original)throw new Error("Refund must be greater than 0 and not exceed the original fee.");const {error}=await sb.from("refunds").insert({appointment_id:selectedVisit.id,patient_id:selectedVisit.patient_id,patient_name:selectedVisit.patient_name,original_fee:original,refund_amount:amount,method:"Cash",status:"pending",requested_by:currentUser.id,doctor_name:currentProfile.name});if(error)throw error;hideModal("refundModal");toast("Cash refund sent to Reception.");await loadRefunds()}catch(e){alert(friendlyError(e))}};
+async function openRefundForm(){
+  if(!selectedVisit)return;
+  const original=Number(selectedVisit.fee||0);
+  const {data,error}=await sb.from("refunds").select("refund_amount,status").eq("appointment_id",selectedVisit.id);
+  if(error){alert(friendlyError(error));return}
+  const refunded=(data||[]).reduce((sum,r)=>sum+Number(r.refund_amount||0),0);
+  const remaining=Math.max(0,original-refunded);
+  $("refundPatientInfo").innerHTML=`<b>Patient:</b> ${esc(selectedVisit.patient_name)}<br><b>Original fees:</b> ₹${original.toFixed(2)}<br><b>Already requested/refunded:</b> ₹${refunded.toFixed(2)}<br><b>Remaining refundable:</b> ₹${remaining.toFixed(2)}<br><b>Refund method:</b> Cash`;
+  $("rOriginal").value=original.toFixed(2);
+  $("rAmount").value="";
+  $("rAmount").max=remaining.toFixed(2);
+  $("rAmount").disabled=remaining<=0;
+  $("refundSubmitBtn").disabled=remaining<=0;
+  showModal("refundModal");
+}
+$("refundBtn").onclick=openRefundForm;
+$("refundForm").onsubmit=async e=>{e.preventDefault();try{const amount=Number($("rAmount").value),original=Number(selectedVisit.fee||0);const {data:existing,error:re}=await sb.from("refunds").select("refund_amount").eq("appointment_id",selectedVisit.id);if(re)throw re;const refunded=(existing||[]).reduce((sum,r)=>sum+Number(r.refund_amount||0),0);const remaining=Math.max(0,original-refunded);if(amount<=0||amount>remaining)throw new Error(`Refund must be greater than 0 and not exceed the remaining refundable amount of ₹${remaining.toFixed(2)}.`);const {error}=await sb.from("refunds").insert({appointment_id:selectedVisit.id,patient_id:selectedVisit.patient_id,patient_name:selectedVisit.patient_name,original_fee:original,refund_amount:amount,method:"Cash",status:"pending",requested_by:currentUser.id,doctor_name:currentProfile.name});if(error)throw error;hideModal("refundModal");toast("Refund notice sent to Reception for cash clearance.");await loadRefunds()}catch(e){alert(friendlyError(e))}};
 
 async function loadRefunds(){const {data,error}=await sb.from("refunds").select("*").eq("status","pending").order("requested_at",{ascending:false});if(error)throw error;$("refundList").innerHTML=data?.length?data.map(r=>`<div class="item"><div><h3>${esc(r.patient_name)}</h3><p>Original fee: ₹${Number(r.original_fee).toFixed(2)} · Refund: <b>₹${Number(r.refund_amount).toFixed(2)}</b> · Cash</p><p>Requested by: ${esc(r.doctor_name||"-")} · ${fmtDate(r.requested_at)}</p></div><button class="primary" data-complete-refund="${r.id}">Cash Given — Complete</button></div>`).join(""):"<div class='panel'>No pending refunds.</div>";$("statRefunds").textContent=data?.length||0;document.querySelectorAll("[data-complete-refund]").forEach(b=>b.onclick=()=>completeRefund(b.dataset.completeRefund))}
 async function completeRefund(id){const {error}=await sb.from("refunds").update({status:"completed",completed_by:currentUser.id,completed_at:new Date().toISOString()}).eq("id",id);if(error)throw error;toast("Refund marked completed.");await loadRefunds()}
