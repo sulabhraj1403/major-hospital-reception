@@ -45,17 +45,6 @@
       </aside>
 
       <main class="content">
-        <section id="dashboard" class="page">
-          <div class="page-head"><div><h2>Dashboard</h2><p id="todayText"></p></div></div>
-          <div class="cards">
-            <div class="stat"><span>Today's bookings</span><strong id="statBookings">0</strong></div>
-            <div class="stat"><span>Waiting</span><strong id="statWaiting">0</strong></div>
-            <div class="stat"><span>Seen</span><strong id="statSeen">0</strong></div>
-            <div class="stat"><span>Pending refunds</span><strong id="statRefunds">0</strong></div>
-          </div>
-          <div class="panel"><h3>System</h3><p>Use the menu to manage patients, bookings, doctor notes and refunds.</p></div>
-        </section>
-
         <section id="reception" class="page">
           <div class="page-head"><div><h2>Reception</h2><p>Patient registration, bookings and cash refunds</p></div><button class="primary" id="newBookingBtn">+ New Booking</button></div>
           <div class="cards">
@@ -70,7 +59,7 @@
 
         <section id="patients" class="page hidden">
           <div class="page-head"><div><h2>Patients</h2><p>Patient registration and records</p></div></div>
-          <div class="toolbar"><input id="patientSearch" placeholder="Search by name or mobile"></div>
+          <div class="toolbar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px"><input id="patientSearch" placeholder="Search by name or mobile"><input id="patientPlaceSearch" placeholder="Search by place / address"></div>
           <div id="patientList" class="list"></div>
         </section>
 

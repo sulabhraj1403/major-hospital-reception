@@ -88,7 +88,7 @@ async function openPage(page) {
   if (page === "patients") await loadPatients();
   if (page === "appointments") await loadAppointments();
   if (page === "doctor") await loadDoctorPatients();
-  if (page === "reception") await loadRefunds();
+  if (page === "reception") { await loadDashboard(); await loadRefunds(); }
 }
 
 async function loadDashboard() {
@@ -116,10 +116,18 @@ function renderPatients(arr) {
     </div>`).join("") : `<div class="panel">No patients found.</div>`;
   document.querySelectorAll("[data-view-patient]").forEach(b => b.addEventListener("click",()=>viewPatient(b.dataset.viewPatient)));
 }
-$("patientSearch").addEventListener("input", e => {
-  const q=e.target.value.toLowerCase();
-  renderPatients(patientsCache.filter(p => `${p.name} ${p.mobile||""}`.toLowerCase().includes(q)));
-});
+function filterPatients() {
+  const q = $("patientSearch").value.trim().toLowerCase();
+  const place = $("patientPlaceSearch").value.trim().toLowerCase();
+  const filtered = patientsCache.filter(p => {
+    const nameMobile = `${p.name||""} ${p.mobile||""}`.toLowerCase();
+    const address = `${p.address||""}`.toLowerCase();
+    return (!q || nameMobile.includes(q)) && (!place || address.includes(place));
+  });
+  renderPatients(filtered);
+}
+$("patientSearch").addEventListener("input", filterPatients);
+$("patientPlaceSearch").addEventListener("input", filterPatients);
 let createBookingAfterPatient = false;
 
 function openNewPatientForBooking(){

@@ -1,39 +1,32 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function signedIn() {
-      return request.auth != null;
+    function signedIn() { return request.auth != null; }
+    function anonymous() { return signedIn() && request.auth.token.firebase.sign_in_provider == "anonymous"; }
+    function hasRole(r) {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == r;
     }
-    function publicReception() {
-      return signedIn() && request.auth.token.firebase.sign_in_provider == "anonymous";
-    }
-
-    function role() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
-    function isAdmin() { return signedIn() && role() == "admin"; }
-    function isDoctor() { return signedIn() && role() == "doctor"; }
-    function isReception() { return signedIn() && role() == "receptionist"; }
+    function isAdmin() { return hasRole("admin"); }
+    function isDoctor() { return hasRole("doctor"); }
+    function isReception() { return hasRole("receptionist"); }
 
     match /users/{uid} {
-      // Reception uses a query constrained to role == "doctor" to populate
-      // the booking doctor list without exposing non-doctor user profiles.
-      allow read: if (publicReception() && resource.data.role == "doctor")
+      // Reception only needs the minimal doctor profile documents for booking.
+      allow read: if (anonymous() && resource.data.role == "doctor")
                   || (signedIn() && (request.auth.uid == uid || isAdmin()));
       allow create, update, delete: if isAdmin();
     }
 
     match /patients/{id} {
       allow read: if signedIn();
-      allow create, update: if publicReception() || isAdmin() || isReception() || isDoctor();
+      allow create, update: if anonymous() || isAdmin() || isReception() || isDoctor();
       allow delete: if isAdmin();
     }
 
     match /appointments/{id} {
       allow read: if signedIn();
-      allow create, update: if publicReception() || isAdmin() || isReception() || isDoctor();
+      allow create, update: if anonymous() || isAdmin() || isReception() || isDoctor();
       allow delete: if isAdmin() || isReception();
     }
 
@@ -46,7 +39,7 @@ service cloud.firestore {
     match /refunds/{id} {
       allow read: if signedIn();
       allow create: if isAdmin() || isDoctor();
-      allow update: if publicReception() || isAdmin() || isReception();
+      allow update: if anonymous() || isAdmin() || isReception();
       allow delete: if isAdmin();
     }
   }
