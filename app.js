@@ -1,5 +1,5 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./supabase-config.js";
+const { createClient } = window.supabase;
+const { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } = window.MAJOR_HOSPITAL_CONFIG || {};
 
 const sb = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
@@ -204,7 +204,16 @@ async function viewPatient(id){
   const {data:p,error}=await sb.from("patients").select("*").eq("id",id).single();if(error){alert(friendlyError(error));return}
   const {data:history,error:he}=await sb.from("appointments").select("id,date_key,time,fee,payment_method,status,notes,deleted_at").eq("patient_id",id).order("date_key",{ascending:false}).order("time",{ascending:false}).limit(100);
   if(he){alert(friendlyError(he));return}
-  const historyHtml=history?.length?`<h4 style="margin-top:18px">Booking history</h4><div class="history">${history.map(a=>`<div class="note"><b>${esc(a.date_key)} · ${esc(a.time)}</b><br>Fee: ₹${Number(a.fee||0).toFixed(2)} · ${esc(a.payment_method)} · ${esc(a.status||"-")}${a.deleted_at?" · Deleted":""}${a.notes?`<br>Notes: ${esc(a.notes)}`:""}</div>`).join("")}</div>`:"<p class='hint'>No booking history recorded.</p>`;
+  let historyHtml="<p class='hint'>No booking history recorded.</p>";
+  if(history?.length){
+    const rows=history.map(a=>{
+      const note=a.notes ? "<br>Notes: "+esc(a.notes) : "";
+      const deleted=a.deleted_at ? " · Deleted" : "";
+      return "<div class='note'><b>"+esc(a.date_key)+" · "+esc(a.time)+"</b><br>Fee: ₹"+Number(a.fee||0).toFixed(2)+" · "+esc(a.payment_method)+" · "+esc(a.status||"-")+deleted+note+"</div>";
+    }).join("");
+    historyHtml="<h4 style='margin-top:18px'>Booking history</h4><div class='history'>"+rows+"</div>";
+  }
+
   $("patientDetails").innerHTML=`<div class='patient-summary'><p><b>Name:</b> ${esc(p.name)}</p><p><b>Age:</b> ${esc(p.age)}</p><p><b>Gender:</b> ${esc(p.gender)}</p><p><b>Mobile:</b> ${esc(p.mobile||"-")}</p><p><b>Address:</b> ${esc(p.address||"-")}</p><p><b>Blood pressure:</b> ${esc(p.blood_pressure||"-")}</p>${historyHtml}</div>`;
   showModal("patientViewModal")
 }

@@ -70,5 +70,7 @@ window.addEventListener("unhandledrejection", function(e){
   if(el){el.classList.remove("hidden");el.textContent="Website could not start: "+((e.reason&&e.reason.message)||e.reason||"Initialization error");}
 });
 </script>
-<script type="module" src="app.js?v=20260925-2315"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js?v=20260925-2214"></script>
+<script src="app.js?v=20260925-2214"></script>
 </body></html>
