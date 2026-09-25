@@ -301,31 +301,62 @@ async function completeRefund(id){
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
 
-onAuthStateChanged(auth,async user=>{
-  // Reception is the public starting page. A Firebase session is only used
-  // when the user has explicitly entered the Doctor Login.
-  if(!user){
-    currentUser=null; currentProfile=null;
-    $("doctorLoginView").classList.add("hidden");
-    $("appView").classList.remove("hidden");
-    $("roleLabel").textContent="RECEPTION";
-    $("userEmail").textContent="Reception";
-    applyRoleUI();
-    try { await signInAnonymously(auth); } catch(e) { console.error(e); }
-    await openPage("reception");
-    return;
+let authInitialized = false;
+let authReadyResolve;
+const authReady = new Promise(resolve => { authReadyResolve = resolve; });
+
+async function ensureReceptionAuth(){
+  if (auth.currentUser) return auth.currentUser;
+  try {
+    const result = await signInAnonymously(auth);
+    return result.user;
+  } catch(err) {
+    console.error("Reception authentication failed:", err);
+    throw new Error("Reception access is not connected to Firebase Authentication. Please enable Anonymous sign-in in Firebase Authentication → Sign-in providers → Anonymous, then refresh this page.");
   }
-  try{
+}
+
+// Do not allow Firestore operations from an unauthenticated reception session.
+// Firebase evaluates every web Firestore request against the deployed rules.
+async function requireSignedIn(){
+  await authReady;
+  if (!auth.currentUser) await ensureReceptionAuth();
+  if (!auth.currentUser) throw new Error("Firebase authentication is not ready. Please refresh the page.");
+  return auth.currentUser;
+}
+
+onAuthStateChanged(auth,async user=>{
+  try {
+    if(!user){
+      currentUser=null; currentProfile=null;
+      // Start the invisible reception session immediately.
+      const receptionUser = await ensureReceptionAuth();
+      currentUser = receptionUser;
+      currentProfile={role:"receptionist",name:"Reception"};
+      $("doctorLoginView").classList.add("hidden");
+      $("appView").classList.remove("hidden");
+      $("roleLabel").textContent="RECEPTION";
+      $("userEmail").textContent="Reception";
+      applyRoleUI();
+      authInitialized = true;
+      authReadyResolve();
+      await openPage("reception");
+      return;
+    }
+
+    currentUser=user;
     if(user.isAnonymous){
-      currentUser=user; currentProfile={role:"receptionist",name:"Reception"};
+      currentProfile={role:"receptionist",name:"Reception"};
       $("doctorLoginView").classList.add("hidden");
       $("appView").classList.remove("hidden");
       $("userEmail").textContent="Reception";
       applyRoleUI();
+      authInitialized = true;
+      authReadyResolve();
       await openPage("reception");
       return;
     }
-    currentUser=user;
+
     currentProfile=await getProfile(user.uid);
     if(!["doctor","admin"].includes(currentProfile.role)) {
       await signOut(auth);
@@ -333,11 +364,19 @@ onAuthStateChanged(auth,async user=>{
     }
     $("doctorLoginView").classList.add("hidden");
     $("appView").classList.remove("hidden");
-    $("userEmail").textContent=user.email;
+    $("userEmail").textContent=user.email||"";
     applyRoleUI();
+    authInitialized = true;
+    authReadyResolve();
     await openPage(currentProfile.role==="doctor" ? "doctor" : "admin");
   }catch(err){
-    await signOut(auth);
-    $("loginError").textContent=err.message;
+    console.error(err);
+    authInitialized = true;
+    authReadyResolve();
+    $("appView").classList.remove("hidden");
+    $("doctorLoginView").classList.add("hidden");
+    $("roleLabel").textContent="RECEPTION";
+    $("userEmail").textContent="Authentication error";
+    alert(err.message || "Firebase authentication failed.");
   }
 });
