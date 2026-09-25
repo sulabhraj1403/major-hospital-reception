@@ -120,10 +120,21 @@ $("patientSearch").addEventListener("input", e => {
   const q=e.target.value.toLowerCase();
   renderPatients(patientsCache.filter(p => `${p.name} ${p.mobile||""}`.toLowerCase().includes(q)));
 });
-$("newPatientBtn").addEventListener("click",()=>{ $("patientForm").reset(); $("patientId").value=""; $("patientModalTitle").textContent="New Patient"; showModal("patientModal"); });
+let createBookingAfterPatient = false;
+
+function openNewPatientForBooking(){
+  createBookingAfterPatient = true;
+  $("patientForm").reset();
+  $("patientId").value="";
+  $("patientModalTitle").textContent="New Patient";
+  showModal("patientModal");
+}
+
+$("newBookingBtn").addEventListener("click", openNewPatientForBooking);
 
 $("patientForm").addEventListener("submit", async e=>{
   e.preventDefault();
+  try {
   const data = {
     name:$("pName").value.trim(), age:Number($("pAge").value), gender:$("pGender").value,
     mobile:$("pMobile").value.trim(), address:$("pAddress").value.trim(), bloodPressure:$("pBP").value.trim(),
@@ -136,7 +147,21 @@ $("patientForm").addEventListener("submit", async e=>{
     data.patientCode="MH-"+Date.now().toString().slice(-7);
     await addDoc(collection(db,"patients"),data);
   }
-  hideModal("patientModal"); toast("Patient saved."); await loadPatients();
+  hideModal("patientModal");
+  await loadPatients();
+
+  if(createBookingAfterPatient && !id){
+    createBookingAfterPatient = false;
+    const newPatient = patientsCache.find(x => x.patientCode === data.patientCode);
+    await openBookingForPatient(newPatient?.id || "");
+  } else {
+    createBookingAfterPatient = false;
+    toast("Patient saved.");
+  }
+  } catch(err) {
+    console.error(err);
+    alert(err.message || "Unable to save patient.");
+  }
 });
 
 async function viewPatient(id) {
@@ -155,23 +180,34 @@ async function loadAppointments() {
   $("appointmentList").innerHTML=arr.length?arr.map(a=>`
     <div class="item"><div><h3>${esc(a.patientName)}</h3><p>${esc(a.time)} · ${esc(a.doctorName)} · ₹${Number(a.fee||0).toFixed(2)}</p></div><span class="badge ${a.status==="seen"?"seen":"waiting"}">${esc(a.status||"waiting")}</span></div>`).join(""):`<div class="panel">No bookings for today.</div>`;
 }
-$("newBookingBtn").addEventListener("click", async ()=>{
+async function openBookingForPatient(patientId="") {
   await loadPatients();
   await loadDoctors();
   $("bPatient").innerHTML=patientsCache.map(p=>`<option value="${p.id}">${esc(p.name)} — ${esc(p.mobile||p.patientCode||"")}</option>`).join("");
   $("bDoctor").innerHTML=doctorsCache.map(d=>`<option value="${d.id}">${esc(d.name||d.email||d.id)}</option>`).join("");
-  $("bPayment").value="Cash"; $("upiTimeWrap").classList.add("hidden"); $("bUpiTime").required=false;
+  if(patientId && patientsCache.some(p=>p.id===patientId)) $("bPatient").value=patientId;
+  $("bPayment").value="Cash";
+  $("upiTimeWrap").classList.add("hidden");
+  $("bUpiTime").required=false;
   showModal("bookingModal");
-});
+}
+
 $("bPayment").addEventListener("change",()=>{
   const upi=$("bPayment").value==="UPI"; $("upiTimeWrap").classList.toggle("hidden",!upi); $("bUpiTime").required=upi;
 });
 async function loadDoctors() {
-  const snap=await getDocs(query(collection(db,"users"),where("role","==","doctor")));
-  doctorsCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+  try {
+    const snap=await getDocs(query(collection(db,"users"),where("role","==","doctor")));
+    doctorsCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(!doctorsCache.length) throw new Error("No doctor profiles found. Create users/{Doctor UID} with role = doctor.");
+  } catch(err) {
+    doctorsCache=[];
+    throw err;
+  }
 }
 $("bookingForm").addEventListener("submit",async e=>{
   e.preventDefault();
+  try {
   const p=patientsCache.find(x=>x.id===$("bPatient").value);
   const d=doctorsCache.find(x=>x.id===$("bDoctor").value);
   const data={
@@ -182,15 +218,27 @@ $("bookingForm").addEventListener("submit",async e=>{
   };
   await addDoc(collection(db,"appointments"),data);
   hideModal("bookingModal");toast("Booking created.");await loadAppointments();await loadDashboard();
+  } catch(err) {
+    console.error(err);
+    alert(err.message || "Unable to create booking.");
+  }
 });
 
 async function loadDoctorPatients() {
-  const snap=await getDocs(query(collection(db,"appointments"),where("dateKey","==",todayKey()),where("doctorId","==",currentUser.uid)));
-  const arr=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.time||"").localeCompare(b.time||""));
+  $("doctorList").innerHTML = `<div class="panel">Loading today's patients…</div>`;
+  try {
+    const snap=await getDocs(query(collection(db,"appointments"),where("doctorId","==",currentUser.uid),limit(200)));
+    const arr=snap.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(a=>a.dateKey===todayKey())
+      .sort((a,b)=>(a.time||"").localeCompare(b.time||""));
   $("doctorList").innerHTML=arr.length?arr.map(a=>`
     <div class="item"><div><h3>${esc(a.patientName)}</h3><p>${esc(a.time)} · Fee ₹${Number(a.fee||0).toFixed(2)} · ${esc(a.paymentMethod)}</p></div>
     <div class="item-actions"><span class="badge ${a.status==="seen"?"seen":"waiting"}">${esc(a.status||"waiting")}</span><button class="primary" data-visit="${a.id}">Open</button></div></div>`).join(""):`<div class="panel">No patients booked for you today.</div>`;
-  document.querySelectorAll("[data-visit]").forEach(b=>b.addEventListener("click",()=>openVisit(b.dataset.visit)));
+    document.querySelectorAll("[data-visit]").forEach(b=>b.addEventListener("click",()=>openVisit(b.dataset.visit)));
+  } catch(err) {
+    console.error(err);
+    $("doctorList").innerHTML = `<div class="panel error">Unable to load today's patients: ${esc(err.message || err)}</div>`;
+  }
 }
 async function openVisit(id) {
   const snap=await getDoc(doc(db,"appointments",id)); if(!snap.exists()) return;

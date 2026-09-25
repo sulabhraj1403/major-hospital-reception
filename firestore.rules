@@ -18,7 +18,10 @@ service cloud.firestore {
     function isReception() { return signedIn() && role() == "receptionist"; }
 
     match /users/{uid} {
-      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      // Reception uses a query constrained to role == "doctor" to populate
+      // the booking doctor list without exposing non-doctor user profiles.
+      allow read: if (publicReception() && resource.data.role == "doctor")
+                  || (signedIn() && (request.auth.uid == uid || isAdmin()));
       allow create, update, delete: if isAdmin();
     }
 
