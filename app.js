@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, signInAnonymously
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, doc, getDoc, getDocs, updateDoc,
@@ -37,6 +37,19 @@ const showModal = id => $(id).classList.remove("hidden");
 const hideModal = id => $(id).classList.add("hidden");
 
 document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => hideModal(b.dataset.close)));
+
+function showDoctorLogin() {
+  $("appView").classList.add("hidden");
+  $("doctorLoginView").classList.remove("hidden");
+  $("loginError").textContent = "";
+}
+$("doctorLoginNav").addEventListener("click", showDoctorLogin);
+document.querySelectorAll(".backReception").forEach(b => b.addEventListener("click", () => {
+  $("doctorLoginView").classList.add("hidden");
+  $("appView").classList.remove("hidden");
+  openPage("reception");
+}));
+
 
 $("loginForm").addEventListener("submit", async e => {
   e.preventDefault();
@@ -233,16 +246,40 @@ async function completeRefund(id){
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
 
 onAuthStateChanged(auth,async user=>{
+  // Reception is the public starting page. A Firebase session is only used
+  // when the user has explicitly entered the Doctor Login.
   if(!user){
-    currentUser=null;currentProfile=null;$("loginView").classList.remove("hidden");$("appView").classList.add("hidden");return;
+    currentUser=null; currentProfile=null;
+    $("doctorLoginView").classList.add("hidden");
+    $("appView").classList.remove("hidden");
+    $("roleLabel").textContent="RECEPTION";
+    $("userEmail").textContent="Reception";
+    applyRoleUI();
+    try { await signInAnonymously(auth); } catch(e) { console.error(e); }
+    await openPage("reception");
+    return;
   }
   try{
+    if(user.isAnonymous){
+      currentUser=user; currentProfile={role:"receptionist",name:"Reception"};
+      $("doctorLoginView").classList.add("hidden");
+      $("appView").classList.remove("hidden");
+      $("userEmail").textContent="Reception";
+      applyRoleUI();
+      await openPage("reception");
+      return;
+    }
     currentUser=user;
     currentProfile=await getProfile(user.uid);
+    if(!["doctor","admin"].includes(currentProfile.role)) {
+      await signOut(auth);
+      return;
+    }
+    $("doctorLoginView").classList.add("hidden");
+    $("appView").classList.remove("hidden");
     $("userEmail").textContent=user.email;
     applyRoleUI();
-    $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
-    await openPage("dashboard");
+    await openPage(currentProfile.role==="doctor" ? "doctor" : "admin");
   }catch(err){
     await signOut(auth);
     $("loginError").textContent=err.message;

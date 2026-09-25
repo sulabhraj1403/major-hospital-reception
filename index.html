@@ -7,19 +7,20 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="loginView" class="center-screen">
+  <div id="doctorLoginView" class="center-screen hidden">
     <div class="login-card">
       <div class="brand">
         <div class="logo">MH</div>
-        <div><h1>Major Hospital</h1><p>Hospital Management System</p></div>
+        <div><h1>Doctor Login</h1><p>Major Hospital</p></div>
       </div>
       <form id="loginForm">
         <label>Email</label>
         <input id="email" type="email" autocomplete="username" required>
         <label>Password</label>
         <input id="password" type="password" autocomplete="current-password" required>
-        <button class="primary" type="submit">Login</button>
+        <button class="primary" type="submit">Doctor Login</button>
         <div id="loginError" class="error"></div>
+        <button type="button" class="outline backReception">Back to Reception</button>
       </form>
     </div>
   </div>
@@ -35,12 +36,12 @@
 
     <div class="layout">
       <aside class="sidebar">
-        <button data-page="dashboard" class="nav active">Dashboard</button>
+        <button data-page="reception" class="nav active">Reception</button>
         <button data-page="patients" class="nav">Patients</button>
         <button data-page="appointments" class="nav">Bookings</button>
         <button data-page="doctor" class="nav doctor-only">Doctor</button>
-        <button data-page="reception" class="nav reception-only">Reception</button>
         <button data-page="admin" class="nav admin-only">Admin</button>
+        <button id="doctorLoginNav" class="nav">Doctor Login</button>
       </aside>
 
       <main class="content">
@@ -53,6 +54,18 @@
             <div class="stat"><span>Pending refunds</span><strong id="statRefunds">0</strong></div>
           </div>
           <div class="panel"><h3>System</h3><p>Use the menu to manage patients, bookings, doctor notes and refunds.</p></div>
+        </section>
+
+        <section id="reception" class="page">
+          <div class="page-head"><div><h2>Reception</h2><p>Patient registration, bookings and cash refunds</p></div><button class="primary" id="newBookingBtn">+ New Booking</button></div>
+          <div class="cards">
+            <div class="stat"><span>Today's bookings</span><strong id="statBookings">0</strong></div>
+            <div class="stat"><span>Waiting</span><strong id="statWaiting">0</strong></div>
+            <div class="stat"><span>Seen</span><strong id="statSeen">0</strong></div>
+            <div class="stat"><span>Pending refunds</span><strong id="statRefunds">0</strong></div>
+          </div>
+          <div class="panel"><h3>Today's bookings</h3><div id="receptionBookings" class="list"></div></div>
+          <div class="panel" style="margin-top:16px"><h3>Pending cash refunds</h3><div id="refundList" class="list"></div></div>
         </section>
 
         <section id="patients" class="page hidden">
@@ -69,11 +82,6 @@
         <section id="doctor" class="page hidden">
           <div class="page-head"><div><h2>Doctor</h2><p>Today's patients and clinical notes</p></div></div>
           <div id="doctorList" class="list"></div>
-        </section>
-
-        <section id="reception" class="page hidden">
-          <div class="page-head"><div><h2>Reception</h2><p>Pending cash refunds</p></div></div>
-          <div id="refundList" class="list"></div>
         </section>
 
         <section id="admin" class="page hidden">

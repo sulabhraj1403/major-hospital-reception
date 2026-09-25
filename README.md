@@ -1,6 +1,6 @@
 # Major Hospital Reception — Web MVP
 
-A responsive Firebase + vanilla JavaScript hospital management website designed to work in Android and desktop browsers.
+A responsive Firebase + vanilla JavaScript hospital management website designed to work in Android and desktop browsers. The website opens directly in Reception; Doctor/Admin access uses Firebase login.
 
 ## Included
 - Firebase Email/Password login
@@ -46,3 +46,6 @@ Before using real patient data:
 
 ## Vercel
 This is a static site. Import the repository into Vercel and deploy with no build command.
+
+## Important flow
+Reception is the starting page and uses Firebase Anonymous Authentication behind the scenes so the receptionist does not see a login screen. The Doctor Login button opens email/password login. Enable Anonymous Authentication in Firebase Authentication -> Sign-in providers.

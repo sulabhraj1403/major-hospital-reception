@@ -5,6 +5,9 @@ service cloud.firestore {
     function signedIn() {
       return request.auth != null;
     }
+    function publicReception() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider == "anonymous";
+    }
 
     function role() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
@@ -21,13 +24,13 @@ service cloud.firestore {
 
     match /patients/{id} {
       allow read: if signedIn();
-      allow create, update: if isAdmin() || isReception() || isDoctor();
+      allow create, update: if publicReception() || isAdmin() || isReception() || isDoctor();
       allow delete: if isAdmin();
     }
 
     match /appointments/{id} {
       allow read: if signedIn();
-      allow create, update: if isAdmin() || isReception() || isDoctor();
+      allow create, update: if publicReception() || isAdmin() || isReception() || isDoctor();
       allow delete: if isAdmin() || isReception();
     }
 
@@ -40,7 +43,7 @@ service cloud.firestore {
     match /refunds/{id} {
       allow read: if signedIn();
       allow create: if isAdmin() || isDoctor();
-      allow update: if isAdmin() || isReception();
+      allow update: if publicReception() || isAdmin() || isReception();
       allow delete: if isAdmin();
     }
   }
