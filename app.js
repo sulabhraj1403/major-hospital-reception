@@ -99,7 +99,7 @@ $("patientForm").addEventListener("submit",async e=>{
 });
 
 async function openBooking(patientId=null){
-  try{await loadDoctors();const {data,error}=await sb.from("patients").select("id,name,mobile").order("name").limit(500);if(error)throw error;patientsCache=data||[];
+  try{const {data,error}=await sb.from("patients").select("id,name,mobile").order("name").limit(500);if(error)throw error;patientsCache=data||[];
     $("bPatient").innerHTML=patientsCache.map(p=>`<option value="${p.id}">${esc(p.name)} — ${esc(p.mobile||"")}</option>`).join("");
     if(patientId)$("bPatient").value=patientId;
     $("bTime").value=new Date().toTimeString().slice(0,5);$("bPayment").value="Cash";showModal("bookingModal");
