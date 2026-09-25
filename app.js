@@ -1,6 +1,6 @@
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./supabase-config.js";
 
-const { createClient } = window.supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
 });
@@ -136,13 +136,17 @@ async function deleteBooking(id){
   if(!id)return;
   if(!confirm("Delete this booking? The patient record and booking history will remain in the Patients tab."))return;
   try{
-    const {data,error}=await sb.rpc("soft_delete_booking",{p_appointment_id:id});
+    const {data,error}=await sb.from("appointments")
+      .update({deleted_at:new Date().toISOString(),updated_at:new Date().toISOString()})
+      .eq("id",id)
+      .is("deleted_at",null)
+      .select("id,deleted_at")
+      .maybeSingle();
     if(error)throw error;
-    const deleted=Array.isArray(data)?data[0]:data;
-    if(!deleted || deleted.deleted_at==null)throw new Error("The booking was not marked as deleted.");
+    if(!data?.deleted_at)throw new Error("The booking could not be deleted. Check the Supabase appointments UPDATE policy.");
     toast("Booking deleted. Patient data remains saved.");
     await loadAppointments();
-    await loadDoctorPatients();
+    if(currentProfile?.role==="doctor") await loadDoctorPatients();
   }catch(e){console.error("deleteBooking failed:",e);alert(friendlyError(e));}
 }
 async function openVisit(id){
@@ -179,10 +183,14 @@ async function completeRefund(id){
   try{
     if(!id)throw new Error("Refund ID is missing.");
     if(!isAnon() && currentProfile?.role!=="admin")throw new Error("Cash refunds can only be completed from the Reception account.");
-    const {data,error}=await sb.rpc("complete_cash_refund",{p_refund_id:id});
+    const {data,error}=await sb.from("refunds")
+      .update({status:"completed",completed_by:currentUser.id,completed_at:new Date().toISOString()})
+      .eq("id",id)
+      .eq("status","pending")
+      .select("id,status")
+      .maybeSingle();
     if(error)throw error;
-    const completed=Array.isArray(data)?data[0]:data;
-    if(!completed || completed.status!=="completed")throw new Error("Supabase did not confirm the cash refund as completed.");
+    if(!data || data.status!=="completed")throw new Error("The refund was not updated. Check the Supabase refunds UPDATE policy.");
     await loadRefunds();
     toast("Cash refund completed and removed from pending refunds.");
   }catch(e){

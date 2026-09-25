@@ -6,6 +6,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="bootError" class="boot-error hidden"></div>
 <div id="doctorLoginView" class="center-screen hidden">
   <div class="login-card">
     <div class="brand"><div class="logo">MH</div><div><h1>Doctor Login</h1><p>Major Hospital</p></div></div>
@@ -59,6 +60,15 @@ active = true</pre><p class="hint">Never put a Supabase secret/service-role key 
 
 <div id="patientViewModal" class="modal hidden"><div class="modal-card wide"><div class="modal-head"><h3>Patient Details</h3><button class="close" data-close="patientViewModal">×</button></div><div id="patientDetails"></div></div></div>
 <div id="toast" class="toast"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="app.js?v=20260925-2255"></script>
+<script>
+window.addEventListener("error", function(e){
+  var el=document.getElementById("bootError");
+  if(el){el.classList.remove("hidden");el.textContent="Website could not start: "+(e.message||"JavaScript error");}
+});
+window.addEventListener("unhandledrejection", function(e){
+  var el=document.getElementById("bootError");
+  if(el){el.classList.remove("hidden");el.textContent="Website could not start: "+((e.reason&&e.reason.message)||e.reason||"Initialization error");}
+});
+</script>
+<script type="module" src="app.js?v=20260925-2315"></script>
 </body></html>
