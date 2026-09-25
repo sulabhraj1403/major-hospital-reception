@@ -101,19 +101,17 @@ $("patientForm").addEventListener("submit",async e=>{
 async function openBooking(patientId=null){
   try{await loadDoctors();const {data,error}=await sb.from("patients").select("id,name,mobile").order("name").limit(500);if(error)throw error;patientsCache=data||[];
     $("bPatient").innerHTML=patientsCache.map(p=>`<option value="${p.id}">${esc(p.name)} — ${esc(p.mobile||"")}</option>`).join("");
-    $("bDoctor").innerHTML=doctorsCache.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join("");
     if(patientId)$("bPatient").value=patientId;
-    $("bTime").value=new Date().toTimeString().slice(0,5);$("bPayment").value="Cash";$("upiTimeWrap").classList.add("hidden");$("bUpiTime").required=false;showModal("bookingModal");
+    $("bTime").value=new Date().toTimeString().slice(0,5);$("bPayment").value="Cash";showModal("bookingModal");
   }catch(err){alert(friendlyError(err))}
 }
-$("bPayment").addEventListener("change",()=>{const upi=$("bPayment").value==="UPI";$("upiTimeWrap").classList.toggle("hidden",!upi);$("bUpiTime").required=upi});
 $("bookingForm").addEventListener("submit",async e=>{
-  e.preventDefault();try{const p=patientsCache.find(x=>x.id===$("bPatient").value),d=doctorsCache.find(x=>x.id===$("bDoctor").value);if(!p||!d)throw new Error("Select a patient and doctor.");const row={patient_id:p.id,patient_name:p.name,doctor_id:d.id,doctor_name:d.name,date_key:todayKey(),time:$("bTime").value,fee:Number($("bFee").value),payment_method:$("bPayment").value,upi_payment_time:$("bPayment").value==="UPI"?$("bUpiTime").value:null,status:"waiting",created_by:currentUser.id};const {error}=await sb.from("appointments").insert(row);if(error)throw error;hideModal("bookingModal");toast("Booking created.");await loadAppointments();await loadRefunds();}catch(err){console.error(err);alert(friendlyError(err))}
+  e.preventDefault();try{const p=patientsCache.find(x=>x.id===$("bPatient").value);if(!p)throw new Error("Select a patient.");const row={patient_id:p.id,patient_name:p.name,date_key:todayKey(),time:$("bTime").value,fee:Number($("bFee").value),payment_method:$("bPayment").value,status:"waiting",created_by:currentUser.id};const {error}=await sb.from("appointments").insert(row);if(error)throw error;hideModal("bookingModal");toast("Booking created.");await loadAppointments();await loadRefunds();}catch(err){console.error(err);alert(friendlyError(err))}
 });
 
 async function loadAppointments(){
   const {data,error}=await sb.from("appointments").select("*").order("time",{ascending:true}).limit(500);if(error)throw error;const arr=data||[];const today=arr.filter(a=>a.date_key===todayKey());
-  const render=a=>`<div class="item"><div><h3>${esc(a.patient_name)}</h3><p>${esc(a.time)} · Dr. ${esc(a.doctor_name)} · ₹${Number(a.fee||0).toFixed(2)} · ${esc(a.payment_method)}</p></div><span class="badge ${a.status==='seen'?'seen':'waiting'}">${esc(a.status||'waiting')}</span></div>`;
+  const render=a=>`<div class="item"><div><h3>${esc(a.patient_name)}</h3><p>${esc(a.time)} · ₹${Number(a.fee||0).toFixed(2)} · ${esc(a.payment_method)}</p></div><span class="badge ${a.status==='seen'?'seen':'waiting'}">${esc(a.status||'waiting')}</span></div>`;
   $("receptionBookings").innerHTML=today.length?today.map(render).join(""):"<div class='panel'>No bookings today.</div>";
   $("appointmentList").innerHTML=arr.length?arr.map(render).join(""):"<div class='panel'>No bookings found.</div>";
   $("statBookings").textContent=today.length;$("statWaiting").textContent=today.filter(a=>a.status==='waiting').length;$("statSeen").textContent=today.filter(a=>a.status==='seen').length;
@@ -121,7 +119,7 @@ async function loadAppointments(){
 
 async function loadDoctorPatients(){
   $("doctorList").innerHTML="<div class='panel'>Loading today's patients…</div>";
-  const {data,error}=await sb.from("appointments").select("*").eq("doctor_id",currentUser.id).eq("date_key",todayKey()).order("time",{ascending:true});if(error){$("doctorList").innerHTML=`<div class='panel error'>${esc(friendlyError(error))}</div>`;return}
+  const {data,error}=await sb.from("appointments").select("*").eq("date_key",todayKey()).order("time",{ascending:true});if(error){$("doctorList").innerHTML=`<div class='panel error'>${esc(friendlyError(error))}</div>`;return}
   $("doctorList").innerHTML=data?.length?data.map(a=>`<div class="item"><div><h3>${esc(a.patient_name)}</h3><p>${esc(a.time)} · Fee ₹${Number(a.fee||0).toFixed(2)} · ${esc(a.payment_method)}</p></div><div class="item-actions"><span class="badge ${a.status==='seen'?'seen':'waiting'}">${esc(a.status||'waiting')}</span><button class="primary" data-visit="${a.id}">Open</button></div></div>`).join(""):"<div class='panel'>No patients booked for you today.</div>";
   document.querySelectorAll("[data-visit]").forEach(b=>b.onclick=()=>openVisit(b.dataset.visit));
 }
