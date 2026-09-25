@@ -151,7 +151,24 @@ $("refundBtn").onclick=openRefundForm;
 $("refundForm").onsubmit=async e=>{e.preventDefault();try{const amount=Number($("rAmount").value),original=Number(selectedVisit.fee||0);const {data:existing,error:re}=await sb.from("refunds").select("refund_amount").eq("appointment_id",selectedVisit.id);if(re)throw re;const refunded=(existing||[]).reduce((sum,r)=>sum+Number(r.refund_amount||0),0);const remaining=Math.max(0,original-refunded);if(amount<=0||amount>remaining)throw new Error(`Refund must be greater than 0 and not exceed the remaining refundable amount of ₹${remaining.toFixed(2)}.`);const {error}=await sb.from("refunds").insert({appointment_id:selectedVisit.id,patient_id:selectedVisit.patient_id,patient_name:selectedVisit.patient_name,original_fee:original,refund_amount:amount,method:"Cash",status:"pending",requested_by:currentUser.id,doctor_name:currentProfile.name});if(error)throw error;hideModal("refundModal");toast("Refund notice sent to Reception for cash clearance.");await loadRefunds()}catch(e){alert(friendlyError(e))}};
 
 async function loadRefunds(){const {data,error}=await sb.from("refunds").select("*").eq("status","pending").order("requested_at",{ascending:false});if(error)throw error;$("refundList").innerHTML=data?.length?data.map(r=>`<div class="item"><div><h3>${esc(r.patient_name)}</h3><p>Original fee: ₹${Number(r.original_fee).toFixed(2)} · Refund: <b>₹${Number(r.refund_amount).toFixed(2)}</b> · Cash</p><p>Requested by: ${esc(r.doctor_name||"-")} · ${fmtDate(r.requested_at)}</p></div><button class="primary" data-complete-refund="${r.id}">Cash Given — Complete</button></div>`).join(""):"<div class='panel'>No pending refunds.</div>";$("statRefunds").textContent=data?.length||0;document.querySelectorAll("[data-complete-refund]").forEach(b=>b.onclick=()=>completeRefund(b.dataset.completeRefund))}
-async function completeRefund(id){const button=document.querySelector(`[data-complete-refund="${id}"]`);if(button){button.disabled=true;button.textContent="Completing…"}try{const {error:updateError}=await sb.from("refunds").update({status:"completed",completed_by:currentUser.id,completed_at:new Date().toISOString()}).eq("id",id).eq("status","pending");if(updateError)throw updateError;const {data:check,error:checkError}=await sb.from("refunds").select("id,status").eq("id",id).maybeSingle();if(checkError)throw checkError;if(!check||check.status!=="completed")throw new Error("Supabase did not confirm that the refund was changed to completed. Please run the refund-completion SQL migration in Supabase.");await loadRefunds();toast("Cash refund completed and removed from pending refunds.")}catch(e){if(button){button.disabled=false;button.textContent="Cash Given — Complete"}console.error(e);alert(friendlyError(e))}}
+async function completeRefund(id){
+  const button=document.querySelector(`[data-complete-refund="${id}"]`);
+  if(button){button.disabled=true;button.textContent="Completing…"}
+  try{
+    if(!id)throw new Error("Refund ID is missing.");
+    if(!isAnon() && currentProfile?.role!=="admin")throw new Error("Cash refunds can only be completed from the Reception account.");
+    const {data,error}=await sb.rpc("complete_cash_refund",{p_refund_id:id});
+    if(error)throw error;
+    const completed=Array.isArray(data)?data[0]:data;
+    if(!completed || completed.status!=="completed")throw new Error("Supabase did not confirm the cash refund as completed.");
+    await loadRefunds();
+    toast("Cash refund completed and removed from pending refunds.");
+  }catch(e){
+    if(button){button.disabled=false;button.textContent="Cash Given — Complete"}
+    console.error("completeRefund failed:",e);
+    alert(friendlyError(e));
+  }
+}
 
 async function viewPatient(id){const {data:p,error}=await sb.from("patients").select("*").eq("id",id).single();if(error){alert(friendlyError(error));return}$("patientDetails").innerHTML=`<div class='patient-summary'><p><b>Name:</b> ${esc(p.name)}</p><p><b>Age:</b> ${esc(p.age)}</p><p><b>Gender:</b> ${esc(p.gender)}</p><p><b>Mobile:</b> ${esc(p.mobile||"-")}</p><p><b>Address:</b> ${esc(p.address||"-")}</p><p><b>Blood pressure:</b> ${esc(p.blood_pressure||"-")}</p></div>`;showModal("patientViewModal")}
 
