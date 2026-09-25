@@ -61,16 +61,39 @@ active = true</pre><p class="hint">Never put a Supabase secret/service-role key 
 <div id="patientViewModal" class="modal hidden"><div class="modal-card wide"><div class="modal-head"><h3>Patient Details</h3><button class="close" data-close="patientViewModal">×</button></div><div id="patientDetails"></div></div></div>
 <div id="toast" class="toast"></div>
 <script>
-window.addEventListener("error", function(e){
-  var el=document.getElementById("bootError");
-  if(el){el.classList.remove("hidden");el.textContent="Website could not start: "+(e.message||"JavaScript error");}
-});
-window.addEventListener("unhandledrejection", function(e){
-  var el=document.getElementById("bootError");
-  if(el){el.classList.remove("hidden");el.textContent="Website could not start: "+((e.reason&&e.reason.message)||e.reason||"Initialization error");}
-});
+(function(){
+  var bootError=document.getElementById("bootError");
+  function showError(msg){ if(bootError){bootError.classList.remove("hidden");bootError.textContent="Website could not start: "+msg;} }
+  window.addEventListener("error",function(e){
+    if(e && e.filename && /supabase|cdn.jsdelivr|unpkg/.test(e.filename)) return;
+    showError((e && e.message) || "JavaScript error");
+  });
+  window.addEventListener("unhandledrejection",function(e){ showError((e.reason&&e.reason.message)||e.reason||"Initialization error"); });
+  function load(url,done,fail){
+    var s=document.createElement("script");
+    s.src=url; s.async=false;
+    s.onload=function(){done();};
+    s.onerror=function(){fail();};
+    document.head.appendChild(s);
+  }
+  function start(){
+    if(!window.supabase || !window.supabase.createClient){showError("Supabase library could not be loaded. Check your internet connection or CDN access.");return;}
+    var c=document.createElement("script");
+    c.src="supabase-config.js?v=20260925-2219"; c.onload=function(){
+      var a=document.createElement("script");
+      a.src="app.js?v=20260925-2219"; a.onload=function(){}; a.onerror=function(){showError("The application script could not be loaded.");};
+      document.body.appendChild(a);
+    };
+    c.onerror=function(){showError("supabase-config.js could not be loaded.");};
+    document.body.appendChild(c);
+  }
+  load("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js",start,function(){
+    load("https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js",start,function(){
+      load("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js",start,function(){
+        load("https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js",start,function(){showError("Supabase library could not be loaded from the available CDNs.");});
+      });
+    });
+  });
+})();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="supabase-config.js?v=20260925-2214"></script>
-<script src="app.js?v=20260925-2214"></script>
 </body></html>
