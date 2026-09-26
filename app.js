@@ -74,13 +74,14 @@ $("loginForm").addEventListener("submit",async e=>{
 async function loadDoctors(){const {data,error}=await sb.from("doctors").select("id,name,active").eq("active",true).order("name");if(error)throw error;doctorsCache=data||[];if(!doctorsCache.length)throw new Error("No active doctors found. Add the doctor to the doctors table.")}
 async function loadPatients(){
   const nameQ=$("patientSearch").value.trim().toLowerCase(), placeQ=$("patientPlaceSearch").value.trim().toLowerCase();
-  let q=sb.from("patients").select("*").order("created_at",{ascending:false}).limit(500);
+  let q=sb.from("patients").select("*").is("deleted_at",null).order("created_at",{ascending:false}).limit(500);
   if(nameQ)q=q.or(`name.ilike.%${nameQ}%,mobile.ilike.%${nameQ}%`);
   if(placeQ)q=q.ilike("address",`%${placeQ}%`);
   const {data,error}=await q;if(error)throw error;patientsCache=data||[];
-  $("patientList").innerHTML=patientsCache.length?patientsCache.map(p=>`<div class="item"><div><h3>${esc(p.name)}</h3><p>${esc(p.age)} years · ${esc(p.gender)} · ${esc(p.mobile||"-")} · ${esc(p.address||"-")}</p></div><div class="item-actions"><button class="outline" data-view-patient="${p.id}">View</button><button class="primary" data-book-patient="${p.id}">Book</button></div></div>`).join(""):"<div class='panel'>No matching patients.</div>";
+  const canDeletePatients=currentProfile?.role==="doctor";
+  $("patientList").innerHTML=patientsCache.length?patientsCache.map(p=>`<div class="item"><div><h3>${esc(p.name)}</h3><p>${esc(p.age)} years · ${esc(p.gender)} · ${esc(p.mobile||"-")} · ${esc(p.address||"-")}</p></div><div class="item-actions"><button class="outline" data-view-patient="${p.id}">View</button>${canDeletePatients?`<button class="outline" data-delete-patient="${p.id}">Delete</button>`:""}</div></div>`).join(""):"<div class='panel'>No matching patients.</div>";
   document.querySelectorAll("[data-view-patient]").forEach(b=>b.onclick=()=>viewPatient(b.dataset.viewPatient));
-  document.querySelectorAll("[data-book-patient]").forEach(b=>b.onclick=()=>openBooking(b.dataset.bookPatient));
+  if(canDeletePatients) document.querySelectorAll("[data-delete-patient]").forEach(b=>b.onclick=()=>deletePatient(b.dataset.deletePatient));
 }
 $("patientSearch").addEventListener("input",loadPatients);$("patientPlaceSearch").addEventListener("input",loadPatients);
 
@@ -99,7 +100,7 @@ $("patientForm").addEventListener("submit",async e=>{
 });
 
 async function openBooking(patientId=null){
-  try{const {data,error}=await sb.from("patients").select("id,name,mobile").order("name").limit(500);if(error)throw error;patientsCache=data||[];
+  try{const {data,error}=await sb.from("patients").select("id,name,mobile").is("deleted_at",null).order("name").limit(500);if(error)throw error;patientsCache=data||[];
     $("bPatient").innerHTML=patientsCache.map(p=>`<option value="${p.id}">${esc(p.name)} — ${esc(p.mobile||"")}</option>`).join("");
     if(patientId)$("bPatient").value=patientId;
     $("bTime").value=new Date().toTimeString().slice(0,5);$("bPayment").value="Cash";showModal("bookingModal");
@@ -110,13 +111,14 @@ $("bookingForm").addEventListener("submit",async e=>{
 });
 
 async function loadAppointments(){
-  const {data,error}=await sb.from("appointments").select("*").is("deleted_at",null).order("date_key",{ascending:false}).order("time",{ascending:true}).limit(500);
+  const todayKeyValue=todayKey();
+  const {data,error}=await sb.from("appointments").select("*").eq("date_key",todayKeyValue).is("deleted_at",null).order("time",{ascending:true}).limit(500);
   if(error)throw error;
-  const arr=data||[];const today=arr.filter(a=>a.date_key===todayKey());
-  const render=(a,showDate=false)=>`<div class="item"><div><h3>${esc(a.patient_name)}</h3><p>${showDate?esc(a.date_key)+" · ":""}${esc(a.time)} · ₹${Number(a.fee||0).toFixed(2)} · ${esc(a.payment_method)}</p></div><div class="item-actions"><span class="badge ${a.status==='seen'?'seen':'waiting'}">${esc(a.status||'waiting')}</span><button class="outline" data-delete-booking="${a.id}">Delete</button></div></div>`;
-  $("receptionBookings").innerHTML=today.length?today.map(a=>render(a)).join(""):"<div class='panel'>No bookings today.</div>";
-  $("appointmentList").innerHTML=arr.length?arr.map(a=>render(a,true)).join(""):"<div class='panel'>No bookings found.</div>";
-  $("statBookings").textContent=today.length;$("statWaiting").textContent=today.filter(a=>a.status==='waiting').length;$("statSeen").textContent=today.filter(a=>a.status==='seen').length;
+  const arr=data||[];
+  const render=a=>`<div class="item"><div><h3>${esc(a.patient_name)}</h3><p>${esc(a.time)} · ₹${Number(a.fee||0).toFixed(2)} · ${esc(a.payment_method)}</p></div><div class="item-actions"><span class="badge ${a.status==='seen'?'seen':'waiting'}">${esc(a.status||'waiting')}</span><button class="outline" data-delete-booking="${a.id}">Delete</button></div></div>`;
+  $("receptionBookings").innerHTML=arr.length?arr.map(render).join(""):"<div class='panel'>No bookings today.</div>";
+  $("appointmentList").innerHTML=arr.length?arr.map(render).join(""):"<div class='panel'>No bookings today. New bookings can be created for today.</div>";
+  $("statBookings").textContent=arr.length;$("statWaiting").textContent=arr.filter(a=>a.status==='waiting').length;$("statSeen").textContent=arr.filter(a=>a.status==='seen').length;
   bindDeleteBookingButtons();
 }
 
@@ -130,6 +132,19 @@ async function loadDoctorPatients(){
 
 function bindDeleteBookingButtons(){
   document.querySelectorAll("[data-delete-booking]").forEach(b=>b.onclick=()=>deleteBooking(b.dataset.deleteBooking));
+}
+
+async function deletePatient(id){
+  if(currentProfile?.role!=="doctor")return;
+  if(!id)return;
+  if(!confirm("Delete this patient from the Patients tab? Existing booking history, visits and refunds will be preserved."))return;
+  try{
+    const {data,error}=await sb.from("patients").update({deleted_at:new Date().toISOString()}).eq("id",id).is("deleted_at",null).select("id,deleted_at").maybeSingle();
+    if(error)throw error;
+    if(!data?.deleted_at)throw new Error("The patient could not be deleted. Check the Supabase patients UPDATE policy.");
+    toast("Patient deleted. Existing history is preserved.");
+    await loadPatients();
+  }catch(e){console.error("deletePatient failed:",e);alert(friendlyError(e));}
 }
 
 async function deleteBooking(id){
